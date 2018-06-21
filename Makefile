@@ -6,7 +6,7 @@ travis : docker
 # Docker build
 git_rev := $(shell git rev-parse --short HEAD)
 git_tag := $(shell git tag --points-at=$(git_rev))
-image_prefix := skycirrus/fluentd
+image_prefix := skycirrus/fluentd-docker
 
 docker :
 	@echo "== build docker images"
