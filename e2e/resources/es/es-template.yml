@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-template
+  namespace: kube-system
+data:
+  template.json: |-
+    {
+      "template": "logs-kind-*",
+      "settings": {
+        "number_of_shards": 1,
+        "number_of_replicas": 0,
+        "index.mapping.ignore_malformed": true
+      },
+      "mappings": {
+        "flb_type": {
+          "dynamic": true,
+          "dynamic_templates": [
+            {
+              "custom_app_fields" : {
+                "match_mapping_type": "string",
+                "mapping": { "type": "keyword" }
+              }
+            }
+          ],
+          "properties": {
+            "message": {
+              "type": "text"
+            },
+            "@shipper-timestamp": {
+              "type": "date",
+              "format": "strict_date_optional_time||epoch_millis"
+            },
+            "@timestamp": {
+              "type": "date",
+              "format": "strict_date_optional_time||epoch_millis"
+            },
+            "docker": {
+              "properties": {
+                "container_id": {
+                  "type": "keyword"
+                }
+              }
+            },
+            "kubernetes": {
+              "properties": {
+                "annotations": {
+                  "type": "object"
+                },
+                "container_name": {
+                  "type": "keyword"
+                },
+                "host": {
+                  "type": "keyword"
+                },
+                "labels": {
+                  "properties": {
+                    "app": {
+                      "type": "keyword"
+                    },
+                    "deployment": {
+                      "type": "keyword"
+                    },
+                    "k8s-app": {
+                      "type": "keyword"
+                    },
+                    "kubernetes_io/cluster-service": {
+                      "type": "keyword"
+                    },
+                    "pod-template-hash": {
+                      "type": "keyword"
+                    },
+                    "version": {
+                      "type": "keyword"
+                    }
+                  }
+                },
+                "cluster": {
+                  "type": "keyword"
+                },
+                "namespace_name": {
+                  "type": "keyword"
+                },
+                "pod_id": {
+                  "type": "keyword"
+                },
+                "pod_name": {
+                  "type": "keyword"
+                }
+              }
+            },
+            "log": {
+              "type": "text"
+            },
+            "stream": {
+              "type": "keyword"
+            }
+          }
+        }
+      }
+    }

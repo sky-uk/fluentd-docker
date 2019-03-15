@@ -1,20 +1,42 @@
-FROM fluent/fluentd:v1.2-debian-onbuild
+FROM debian:stretch-slim
 
-# below RUN includes plugin as examples elasticsearch is not required
-# you may customize including plugins as you wish
+ARG DEBIAN_FRONTEND=noninteractive
 
-RUN buildDeps="sudo make gcc g++ libc-dev ruby-dev" \
- && apt-get update \
- && apt-get install -y --no-install-recommends $buildDeps \
- && sudo gem install fluent-plugin-elasticsearch \
- && sudo gem install fluent-plugin-rewrite-tag-filter \
- && sudo gem install fluent-plugin-prometheus \
- && sudo gem sources --clear-all \
- && SUDO_FORCE_REMOVE=yes \
-    apt-get purge -y --auto-remove \
-                  -o APT::AutoRemove::RecommendsImportant=false \
-                  $buildDeps \
- && rm -rf /var/lib/apt/lists/* \
-           /home/fluent/.gem/ruby/2.3.0/cache/*.gem
+COPY Gemfile /Gemfile
 
+RUN BUILD_DEPS="make gcc g++ libc6-dev ruby-dev libffi-dev" \
+    && apt-get update \
+    # Install & configure dependencies.
+    && apt-get install -y --no-install-recommends $BUILD_DEPS \
+                                                  ca-certificates \
+                                                  libjemalloc1 \
+                                                  ruby \
+    && echo 'gem: --no-document' >> /etc/gemrc \
+    # Install fluentd and plugins via ruby.
+    && gem install --file Gemfile \
+    # Remove build dependencies.
+    && apt-get purge -y --auto-remove \
+                     -o APT::AutoRemove::RecommendsImportant=false \
+                     $BUILD_DEPS \
+    # Cleanup leftover caches & files.
+    && apt-get clean -y \
+    && rm -rf /var/cache/debconf/* \
+              /var/lib/apt/lists/* \
+              /var/log/* \
+              /tmp/* \
+              /var/tmp/* \
+              /usr/lib/ruby/gems/*/cache/*.gem
+#    # Ensure fluent has enough file descriptors
+#    && ulimit -n 65536
 
+# Copy the Fluentd configuration file for logging Docker container logs.
+COPY fluent.conf /etc/fluent/fluent.conf
+COPY run.sh /run.sh
+
+# Expose prometheus metrics.
+EXPOSE 80
+
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
+
+# Start Fluentd to pick up our config that watches Docker container logs.
+CMD ["/run.sh"]
