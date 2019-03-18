@@ -29,14 +29,16 @@ const (
 	fluentdManifest = resourcesPath + "/fluentd"
 	kibanaManifest  = resourcesPath + "/kibana"
 	loggerManifest  = resourcesPath + "/logging-pod.yml"
+
+	elasticsearchPort = 9200
 )
 
 var (
 	// Only 1 replica expected for each (from kind.conf)
 	kindMembers = []string{"control-plane", "worker"}
-	elasticsearch k8s.PortForwarder
 	kindctl     kind.Kind
 	kubectl     k8s.Kubectl
+	esForwarder *k8s.PortForwarder
 )
 
 var _ = BeforeSuite(func() {
@@ -48,9 +50,10 @@ var _ = BeforeSuite(func() {
 	// Deploy elastic search
 	kubectl.ApplyFromPath(util.Resource(esManifest))
 	elasticsearchPod := k8s.Pod{
-		Namespace:     "kube-system",
-		Label:         k8s.Label{Name: "k8s-app", Value: "elasticsearch"},
-		PortForwarder: k8s.NewStatefulSetPortForwarder("elasticsearch", 9200),
+		Kind:      "statefulset",
+		Namespace: "kube-system",
+		Name:      "elasticsearch",
+		Label:     k8s.Label{Name: "k8s-app", Value: "elasticsearch"},
 	}
 	kubectl.WaitForStatefulSetReady(elasticsearchPod, time.Duration(2*time.Minute))
 
@@ -59,12 +62,9 @@ var _ = BeforeSuite(func() {
 		// Deploy custom fluentd
 		Namespace: "kube-system",
 		Label:     k8s.Label{Name: "k8s-app", Value: "fluentd-es"},
-	}, time.Duration(1*time.Minute))
+	}, time.Duration(15*time.Minute))
 
-	//ES takes a bit before being ready. TODO: try set up readiness instead
-	time.Sleep(15*time.Second)
-	kubectl.ForwardPort(elasticsearchPod)
-	elasticsearch = elasticsearchPod.PortForwarder
+	esForwarder = k8s.NewPortForwarder(elasticsearchPod, elasticsearchPort)
 })
 
 var _ = AfterSuite(func() {

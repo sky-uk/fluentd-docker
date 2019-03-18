@@ -90,9 +90,10 @@ func (k *Kubectl) prependKubeconfig(args []string) []string {
 }
 
 type Pod struct {
-	Namespace     string
-	PortForwarder PortForwarder
-	Label         Label
+	Namespace string
+	Kind      string
+	Name      string
+	Label     Label
 }
 
 type Label struct {
@@ -174,89 +175,77 @@ func unrecoverable(err error) error {
 	return err
 }
 
-type PortForwarder interface {
-	Kind() string
-	Name() string
-	SetLocalPort(port int32)
-	LocalPort() int32
-	ContainerPort() int32
-	SetSession(session *gexec.Session)
-	Stop()
-	IsForwarding() bool
-	URL() *url.URL
-}
-
-func NewStatefulSetPortForwarder(name string, port int32) PortForwarder {
-	return &statefulsetPortForwarder{
-		name:          name,
-		containerPort: port,
+func NewPortForwarder(pod Pod, targetPort int32) *PortForwarder {
+	return &PortForwarder{
+		pod:           pod,
+		containerPort: targetPort,
 	}
 }
 
-type statefulsetPortForwarder struct {
-	name          string
+type PortForwarder struct {
+	pod           Pod
 	containerPort int32
 	localPort     int32
 	session       *gexec.Session
 }
 
-func (spf *statefulsetPortForwarder) Kind() string {
-	return "statefulset"
+func (pf *PortForwarder) Kind() string {
+	return pf.pod.Kind
 }
 
-func (spf *statefulsetPortForwarder) Name() string {
-	return spf.name
+func (pf *PortForwarder) Name() string {
+	return pf.pod.Name
 }
 
-func (spf *statefulsetPortForwarder) URL() *url.URL {
-	location, err:= url.Parse(fmt.Sprintf("http://localhost:%d", spf.LocalPort()))
+func (pf *PortForwarder) Namespace() string {
+	return pf.pod.Namespace
+}
+
+func (pf *PortForwarder) URL() *url.URL {
+	location, err := url.Parse(fmt.Sprintf("http://localhost:%d", pf.LocalPort()))
 	Expect(err).ToNot(HaveOccurred(), "PortForwarder URL")
 	return location
 }
 
-func (spf *statefulsetPortForwarder) ContainerPort() int32 {
-	return spf.containerPort
+func (pf *PortForwarder) ContainerPort() int32 {
+	return pf.containerPort
 }
 
-func (spf *statefulsetPortForwarder) LocalPort() int32 {
-	return spf.localPort
+func (pf *PortForwarder) LocalPort() int32 {
+	return pf.localPort
 }
 
-func (spf *statefulsetPortForwarder) SetLocalPort(port int32) {
-	spf.localPort = port
+func (pf *PortForwarder) Stop() {
+	pf.session.Terminate().Wait()
 }
 
-func (spf *statefulsetPortForwarder) SetSession(session *gexec.Session) {
-	spf.session = session
+func (pf *PortForwarder) IsForwarding() bool {
+	return pf.session.ExitCode() == -1
 }
 
-func (spf *statefulsetPortForwarder) Stop() {
-	spf.session.Terminate().Wait()
+func (pf *PortForwarder) String() string {
+	return fmt.Sprintf("%s.%s:%d", pf.Namespace(), pf.Name(), pf.ContainerPort())
 }
 
-func (spf *statefulsetPortForwarder) IsForwarding() bool {
-	return spf.session.ExitCode() == -1
-}
-
-func (k *Kubectl) ForwardPort(pod Pod) {
+func (k *Kubectl) ForwardPort(forwarder *PortForwarder) {
 	args := []string{"port-forward",
-		cli.FullFlag("namespace", pod.Namespace),
-		fmt.Sprintf("%s/%s", pod.PortForwarder.Kind(), pod.PortForwarder.Name()),
-		fmt.Sprintf(":%d", pod.PortForwarder.ContainerPort()),
+		cli.FullFlag("namespace", forwarder.Namespace()),
+		fmt.Sprintf("%s/%s", forwarder.Kind(), forwarder.Name()),
+		fmt.Sprintf(":%d", forwarder.ContainerPort()),
 	}
 	session, err := k.runAsync(args)
-	Expect(err).ToNot(HaveOccurred(), "Request ForwardPort for %s.%s:%d", pod.Namespace, pod.PortForwarder.Name(), pod.PortForwarder.ContainerPort())
-	pod.PortForwarder.SetSession(session)
+	Expect(err).ToNot(HaveOccurred(), "Request ForwardPort for %s", forwarder)
+	forwarder.session = session
 	fpRegexp := regexp.MustCompile(`(?m)[^:]+:(\d+) .*$`)
 	err = withRetry(30*time.Second, func() bool {
 		return strings.Contains(string(session.Out.Contents()), "Forwarding from")
 	})
-	Expect(err).ToNot(HaveOccurred(), "Start ForwardPort for %s.%s:%d", pod.Namespace, pod.PortForwarder.Name(), pod.PortForwarder.ContainerPort())
+	Expect(err).ToNot(HaveOccurred(), "Start ForwardPort for %s", forwarder)
 	matches := fpRegexp.FindStringSubmatch(string(session.Out.Contents()))
 	Expect(matches).To(HaveLen(2), "Should match forwarding port regexp")
-	localPort, err := strconv.ParseInt( matches[1], 0, 32)
+	localPort, err := strconv.ParseInt(matches[1], 0, 32)
 	Expect(err).ToNot(HaveOccurred(), "Local port should be an integer")
-	pod.PortForwarder.SetLocalPort(int32(localPort))
+	forwarder.localPort = int32(localPort)
 }
 
 // Installable
