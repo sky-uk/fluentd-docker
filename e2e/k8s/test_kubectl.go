@@ -51,6 +51,15 @@ func (k *Kubectl) ApplyFromPath(path string) {
 	Expect(err).ToNot(HaveOccurred(), "ApplyFromPath %s\noutput: %s\nerror:%s", path, stdout, stderr)
 }
 
+func (k *Kubectl) DeleteFromPath(path string) {
+	args := []string{"delete",
+		cli.FullFlag("kubeconfig", k.kubeconfig),
+		cli.ShortFlag("f", path),
+	}
+	stdout, stderr, err := k.runVerbose(args)
+	Expect(err).ToNot(HaveOccurred(), "DeleteFromPath %s\noutput: %s\nerror:%s", path, stdout, stderr)
+}
+
 func (k *Kubectl) createClient() {
 	config, err := clientcmd.BuildConfigFromFlags("", k.kubeconfig)
 	Expect(err).ToNot(HaveOccurred(), "should load the KinD kubeconfig:s", k.kubeconfig)
@@ -58,16 +67,6 @@ func (k *Kubectl) createClient() {
 	clientset, err := kubernetes.NewForConfig(config)
 	Expect(err).ToNot(HaveOccurred(), "should create the KinD client")
 	k.client = clientset
-}
-
-func (k *Kubectl) DeleteFromPath(path string) {
-	args := []string{"delete",
-		cli.FullFlag("kubeconfig", k.kubeconfig),
-		cli.ShortFlag("f", path),
-	}
-	cmd := exec.Command("kubectl", args...)
-	stdout, stderr, err := cli.ExecWithSuccess(cmd, true)
-	Expect(err).ToNot(HaveOccurred(), "DeleteFromPath %s\noutput: %s\nerror:%s", path, stdout, stderr)
 }
 
 func (k *Kubectl) run(args []string) (stdout string, stderr string, err error) {
