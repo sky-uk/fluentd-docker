@@ -63,7 +63,7 @@ var _ = BeforeSuite(func() {
 
 	//ES takes a bit before being ready. TODO: try set up readiness instead
 	time.Sleep(15*time.Second)
-	kubectl.ForwagsrdPort(elasticsearchPod)
+	kubectl.ForwardPort(elasticsearchPod)
 	elasticsearch = elasticsearchPod.PortForwarder
 })
 

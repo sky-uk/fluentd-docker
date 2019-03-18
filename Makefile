@@ -20,6 +20,7 @@ e2e-setup:
 	dep ensure
 
 .PHONY: e2e
+e2e:
 	@echo "== run end to end tests"
 	ginkgo -v e2e
 
