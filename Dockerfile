@@ -4,21 +4,22 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 COPY Gemfile /Gemfile
 
+    # Install & configure dependencies.
+    # Install fluentd and plugins via ruby.
+    # Remove build dependencies.
+    # Cleanup leftover caches & files.
+    # Ensure fluent has enough file descriptors
 RUN BUILD_DEPS="make gcc g++ libc6-dev ruby-dev libffi-dev" \
     && apt-get update \
-    # Install & configure dependencies.
     && apt-get install -y --no-install-recommends $BUILD_DEPS \
                                                   ca-certificates \
                                                   libjemalloc1 \
                                                   ruby \
     && echo 'gem: --no-document' >> /etc/gemrc \
-    # Install fluentd and plugins via ruby.
     && gem install --file Gemfile \
-    # Remove build dependencies.
     && apt-get purge -y --auto-remove \
                      -o APT::AutoRemove::RecommendsImportant=false \
                      $BUILD_DEPS \
-    # Cleanup leftover caches & files.
     && apt-get clean -y \
     && rm -rf /var/cache/debconf/* \
               /var/lib/apt/lists/* \
@@ -26,7 +27,6 @@ RUN BUILD_DEPS="make gcc g++ libc6-dev ruby-dev libffi-dev" \
               /tmp/* \
               /var/tmp/* \
               /usr/lib/ruby/gems/*/cache/*.gem
-#    # Ensure fluent has enough file descriptors
 #    && ulimit -n 65536
 
 # Copy the Fluentd configuration file for logging Docker container logs.

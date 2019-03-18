@@ -5,22 +5,21 @@ image_prefix := skycirrus/fluentd-docker
 image_latest := $(image_prefix):latest
 
 all: docker e2e
+travis: docker e2e-setup e2e
 
 .PHONY: docker
 docker :
-	@echo "== build docker images"
+	@echo "== build docker image"
 	docker build -t $(image_latest) .
 
 .PHONY: e2e-setup
 e2e-setup:
 	@echo "== setup"
-	go get -u golang.org/x/lint/golint
-	go get -u golang.org/x/tools/cmd/goimports
+	go get github.com/onsi/ginkgo/ginkgo
 	go get -u github.com/golang/dep/cmd/dep
 	dep ensure
 
 .PHONY: e2e
-e2e: e2e-setup
 	@echo "== run end to end tests"
 	ginkgo -v e2e
 
