@@ -62,8 +62,10 @@ var _ = BeforeSuite(func() {
 		// Deploy custom fluentd
 		Namespace: "kube-system",
 		Label:     k8s.Label{Name: "k8s-app", Value: "fluentd-es"},
-	}, time.Duration(15*time.Minute))
+	}, time.Duration(1*time.Minute))
 
+	//TODO: have a better way of guaranteeing that the ES is operational
+	time.Sleep(15*time.Second)
 	esForwarder = k8s.NewPortForwarder(elasticsearchPod, elasticsearchPort)
 })
 
