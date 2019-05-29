@@ -14,7 +14,7 @@ metadata:
 spec:
   terminationGracePeriodSeconds: 3
   containers:
-    - image: alpine:3.2
+    - image: alpine:3.9
       env:
         - name: NODE_NAME
           valueFrom:
